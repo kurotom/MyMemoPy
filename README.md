@@ -6,7 +6,9 @@ Searches MyMemory for matches against a segment.
 
 Call example:
 
-> https://api.mymemory.translated.net/get?q=Hello World!&langpair=en|it
+<a href='https://api.mymemory.translated.net/get?q=Hello World!&langpair=en|it'>https://api.mymemory.translated.net/get?q=Hello World!&langpair=en|it</a>
+
+
 
 
 |     |     |     |     |
@@ -27,7 +29,9 @@ Generates the key associated with a username.
 
 Call example:
 
-**https://api.mymemory.translated.net/keygen?user=username&pass=password**
+<a href='https://api.mymemory.translated.net/keygen?user=username&pass=password'>https://api.mymemory.translated.net/keygen?user=username&pass=password</a>
+
+
 
 Parameter description:
 
@@ -76,4 +80,3 @@ To prevent abuse, we keep track of call rate and enforce limits when necessary.
 Contributes a translation unit (segment and translation) in some language pair to MyMemory.
 
 This is never limited.
-
