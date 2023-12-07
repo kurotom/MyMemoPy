@@ -3,6 +3,16 @@
 
 import requests
 
+from utils.parsers import parse_date_timeout
+
+from exceptions import (
+    ApiGenericException,
+    ApiLimitUsageException,
+    ApiEmailUserException,
+    EmptyTextException,
+    ParameterErrorException,
+)
+
 
 class RequestApi:
     def __init__(
@@ -13,6 +23,7 @@ class RequestApi:
         Constructor, receives a string corresponding to the api url.
         '''
         self.url = url
+        self.timeout = None
 
     def get(
         self,
@@ -20,36 +31,34 @@ class RequestApi:
         source_lang: str,
         target_lang: str,
         email_user: str = None
-    ):
+    ) -> dict:
         '''
         Send the request to the API and return the response or raise an error
         if it occurs.
         '''
         query = f'/get?q={text}&langpair={source_lang}|{target_lang}'
         if email_user is not None:
-            query += f'&de="{email_user}"'
+            query += f'&de={email_user}'
 
         url = self.url + query
-        res = requests.get(url)
+        response = requests.get(url).json()
 
         try:
-            code_status = int(res.json()['responseStatus'])
+            code_status = int(response['responseStatus'])
         except AttributeError:
             pass
 
         if code_status == 200:
             return self.__format_response(
-                                    data_dict=res.json()
+                                    data_dict=response
                                 )
         elif code_status == 429:
-            err_limit = f'Error, characters/day limit reached, {code_status}'
-            raise Exception(err_limit)
+            self.timeout = parse_date_timeout(response["responseDetails"])
+            raise ApiLimitUsageException()
         elif code_status == 403:
-            err_limit = f'Error, email invalid, {code_status}'
-            raise Exception(err_limit)
+            raise ApiEmailUserException()
         else:
-            err_api = f'Error, receiving responses from API, {res.status_code}'
-            raise Exception(err_api)
+            raise ApiGenericException()
 
     def __format_response(
         self,
@@ -62,5 +71,6 @@ class RequestApi:
         return {
             'translatedText': translated['translatedText'],
             'score': translated['match'],
-            'matches': data_dict['matches']
+            'matches': data_dict['matches'],
+            'quotaFinished': data_dict['quotaFinished']
         }

@@ -9,7 +9,7 @@ from typing import List
 class TextWrapper:
     '''
     Class to divide text by string of 500 characters respecting words.
-    
+
     Returns a list of text strings respecting the maximum bytes of the API.
     '''
     ending_text = ['.', ',', ';', ':']  # determines end of paragraph
@@ -43,7 +43,7 @@ class TextWrapper:
     def wrap(
         self,
         text: str
-    ) -> List[str]:
+    ) -> dict:
         '''
         Handles division of text by words. Main function.
 
@@ -51,7 +51,9 @@ class TextWrapper:
                     list: list of string with text splitted.
         '''
         result = []
+        text_size = 0
         if len(self.__to_bytes(text)) <= 500:
+            text_size += len(text)
             result.append(text)
         else:
             while True:
@@ -67,13 +69,17 @@ class TextWrapper:
 
                 chunk_last = chunk[0: self.limit + index]
 
+                text_size += len(chunk_last)
                 result.append(self.__to_string(chunk_last))
 
                 self.start_index += len(chunk_last)
                 self.last_index += len(chunk_last)
 
         self.__clear()
-        return result
+        return {
+            'result': result,
+            'text_size': text_size
+        }
 
     def __clear(self) -> None:
         '''

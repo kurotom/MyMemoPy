@@ -1,12 +1,12 @@
 '''
 '''
 
-import requests
 import locale
 
 # from mimic_useragent import mimic_user_agent
 
 from utils.languages_support import langs
+from utils.parsers import calculate_remain_time
 from text_wrapper import TextWrapper
 from request_api import RequestApi
 
@@ -15,6 +15,18 @@ from users import (
     Anonymous,
     UserValid
 )
+
+from exceptions import (
+    ApiGenericException,
+    # ApiLimitUsageException,
+    ApiEmailUserException,
+    ApiLimitUsageException,
+    EmptyTextException,
+    ParameterErrorException,
+    TimeOutUsage
+)
+
+from typing import Union
 
 
 class MyMemoryTranslate:
@@ -38,9 +50,11 @@ class MyMemoryTranslate:
         email: str = None
     ) -> User:
         if email is None:
-            return Anonymous()
+            user = Anonymous()
         else:
-            return UserValid(email=email)
+            user = UserValid(email=email)
+        user.load_data()
+        return user
 
     def show_languages(
         self,
@@ -99,23 +113,111 @@ class MyMemoryTranslate:
     def __send_to_api(
         self,
         data_dict: dict
-    ) -> list:
+    ) -> dict:
         '''
-        Send data to MyMemory: API.
+        Send data to MyMemory API.
+
+        Returns: dict
+            quotaFinished: bool - indicates if it has reached the limit of use.
+            result: list - list of string translated.
         '''
         result = []
         source = data_dict['source']
         target = data_dict['target']
         list_translate = data_dict['translate']
+        quotaFinished = False
+
         for chunk_text in list_translate:
             response = self.api.get(
                     text=chunk_text,
                     source_lang=source,
                     target_lang=target,
-                    # email_user=self.user.email
+                    email_user=self.user.email
                 )
+            if response['quotaFinished']:
+                quotaFinished = True
+
             result.append(response)
-        return result
+
+        return {
+            'quotaFinished': quotaFinished,
+            'result': result
+        }
+
+    def translate(
+        self,
+        text: str,
+        source_lang: str = 'auto',
+        target_lang: str = 'en'
+    ) -> Union[list, None]:
+        '''
+        Send the given text to api.
+        '''
+        if self.user.timeout is not None:
+            remain_time = calculate_remain_time(self.user.timeout)
+            if remain_time is None:
+                self.user.timeout = None
+            else:
+                self.user.to_write(self.user.to_dict())
+                raise TimeOutUsage(remain_time)
+        if self.user.statusQuota():
+            raise ApiLimitUsageException()
+
+        if len(text) <= 0:
+            raise EmptyTextException()
+        else:
+            if source_lang == 'auto':
+                source_lang = self.local_lang
+            else:
+                source_lang = source_lang.lower()
+
+            target_lang = target_lang.lower()
+
+            correct_langs = [
+                        source_lang in self.code_langs,
+                        target_lang in self.code_langs
+                    ]
+            if not all(correct_langs):
+                if correct_langs[0] is False and correct_langs[1] is False:
+                    raise ParameterErrorException(
+                        f'source_lang="{source_lang}"',
+                        f'target_lang="{target_lang}"'
+                    )
+                elif correct_langs[0] is False:
+                    raise ParameterErrorException(
+                                f'source_lang="{source_lang}"'
+                            )
+                elif correct_langs[1] is False:
+                    raise ParameterErrorException(
+                                f'target_lang="{target_lang}"'
+                            )
+            else:
+                text_wrapper_dict = self.textwrapper.wrap(text)
+
+                data_translate = {
+                    'source': source_lang,
+                    'target': target_lang,
+                    'translate': text_wrapper_dict['result']
+                }
+
+                try:
+                    response_translate = self.__send_to_api(data_translate)
+                    if response_translate['quotaFinished']:
+                        self.user.set_quota(self.user.quota_chars_day)
+                        return None
+                    else:
+                        self.user.set_quota(text_wrapper_dict['text_size'])
+                        return self.__build_text(response_translate['result'])
+                except ApiLimitUsageException:
+                    self.user.timeout = str(self.api.timeout)
+                    self.user.to_write(self.user.to_dict())
+                    return None
+                except ApiEmailUserException:
+                    self.user.to_write(self.user.to_dict())
+                    return None
+                except ApiGenericException:
+                    self.user.to_write(self.user.to_dict())
+                    return None
 
     def __build_text(
         self,
@@ -136,54 +238,24 @@ class MyMemoryTranslate:
             'mean_score': round(sum(scores) / len(scores), 2)
         }
 
-    def translate(
-        self,
-        text: str,
-        source_lang: str = 'auto',
-        target_lang: str = 'en'
-    ):
+    def get_status(self):
         '''
-        Send the given text to api.
         '''
-        if len(text) <= 0:
-            raise ValueError(
-                    'The "text" parameter must be at least 1 character.'
-                )
-        else:
-            if source_lang == 'auto':
-                source_lang = self.local_lang
-            else:
-                source_lang = source_lang.lower()
-
-            target_lang = target_lang.lower()
-
-            correct_langs = [
-                        source_lang in self.code_langs,
-                        target_lang in self.code_langs
-                    ]
-            if not all(correct_langs):
-                msg = 'Parameter `source_lang` or `target_lang` incorrect.\n'
-                raise ValueError(msg + self.__help())
-            else:
-                array_text = self.textwrapper.wrap(text)
-                data_translate = {
-                    'source': source_lang,
-                    'target': target_lang,
-                    'translate': array_text
-                }
-
-                # print(data_translate)
-
-                response_translate = self.__send_to_api(data_translate)
-
-                return self.__build_text(response_translate)
+        return 'User: {0}, Current quota: {1} Quota limit: {2}'.format(
+            self.user.type,
+            self.user.current_quota,
+            self.user.quota_chars_day,
+        )
 
     def get_quota(self):
+        '''
+        '''
         return self.user.get_quota()
 
     def __str__(self):
+        '''
+        '''
         return f'{self.user}'
-
 
 
 text = '''
@@ -208,10 +280,19 @@ En resumen, la inteligencia artificial se encuentra en el centro de una revoluci
 text = 'hola'
 
 # m = MyMemoryTranslate(email='algo@algo.com')
-m = MyMemoryTranslate()
+m = MyMemoryTranslate(email='example@example.com')
+# m = MyMemoryTranslate()
 text = 'hola!'
 print(m)
 print(m.get_quota())
-# for i in range(3):
-#     r = m.translate(text, 'es', 'en')
-#     print(r)
+
+# r = m.translate(text * 2, 'es', 'en')
+
+r = m.translate(text, 'es', 'en')
+print(m)
+
+# r = m.translate(text, 'ex', 'en')
+# r = m.translate(text, 'es', 'nn')
+# r = m.translate(text, 'ex', 'ññ')
+# for i in r:
+#     print(i)
