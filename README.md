@@ -1,3 +1,55 @@
+# Mymemopy
+
+Allows you to translate phrases or text using [Mymemory API](https://mymemory.translated.net/).
+
+# Usage
+
+Just import the `MyMemoryTranslate` class and use the `translate` method, provide the `text`, `source_lang` and `target_lang` parameters, wait for the API response and get your translation.
+
+The API accepts two types of users: `Valid User` (who uses a validated email or API key) and `Anonymous User` (who does not have an email or key). Both have character limitations per day for each translation. [See more details](#MyMemory:-API-usage-limits).
+
+
+## Example of use
+
+```python
+>>> from mymemopy.translator import MyMemoryTranslate
+>>>
+>>> def valid_user():
+...     vu = MyMemoryTranslate(user_email='example@example.com')
+...     print(vu)
+...     print(vu.get_quota())
+...     res = vu.translate(text='hola', source_lang='es', target_lang='en')
+...     print(res)
+...     print(vu)
+...
+>>>
+>>> def anon_user():
+...     au = MyMemoryTranslate()
+...     print(au)
+...     print(au.get_quota())
+...     res = au.translate(text='hola', source_lang='es', target_lang='en')
+...     print(res)
+...     print(au)
+...
+>>>
+>>>
+>>> valid_user()
+User: UserValid, Usage: 20, Limit: 50000, Email: example@example.com
+20
+hello.
+User: UserValid, Usage: 24, Limit: 50000, Email: example@example.com
+>>>
+>>> anon_user()
+User: Anonymous, Usage: 4, Limit: 5000, Email: None
+4
+hello.
+User: Anonymous, Usage: 8, Limit: 5000, Email: None
+>>>
+```
+
+
+
+
 # MyMemory: API technical specifications
 
 ## Get
@@ -7,8 +59,6 @@ Searches MyMemory for matches against a segment.
 Call example:
 
 <a href='https://api.mymemory.translated.net/get?q=Hello World!&langpair=en|it'>https://api.mymemory.translated.net/get?q=Hello World!&langpair=en|it</a>
-
-
 
 
 |     |     |     |     |
@@ -42,7 +92,7 @@ Parameter description:
 | pass | The password associated with the username | Mandatory |     |
 
 
-
+<a name="MyMemory:-API-usage-limits"></a>
 
 # MyMemory: API usage limits
 

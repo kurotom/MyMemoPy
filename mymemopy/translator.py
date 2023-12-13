@@ -233,21 +233,16 @@ class MyMemoryTranslate:
     def __build_text(
         self,
         list_data: list
-    ) -> dict:
+    ) -> str:
         '''
         Build the text and calculate its average score.
         '''
-        scores = []
         text = ''
-        for item in list_data:
-            text += item['translatedText']
-            scores.append(float(item['score']))
+        for line_text in list_data:
+            text += line_text
         if text[-1] != '.':
             text += '.'
-        return {
-            'text': text,
-            'mean_score': round(sum(scores) / len(scores), 2)
-        }
+        return text
 
     def get_status(self) -> str:
         '''

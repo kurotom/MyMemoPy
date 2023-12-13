@@ -138,7 +138,7 @@ class UserValid(User):
     Class to handle users valids.
     '''
 
-    def __init__(self, email: str):
+    def __init__(self, email: str, key: str = None):
         '''
         Constructor
         '''
@@ -150,7 +150,7 @@ class UserValid(User):
         self.last_translate = None
         self.valid_email = True
         self.email = self.set_email(email)
-        self.key = None
+        self.key = key
 
     def set_email(
         self,
