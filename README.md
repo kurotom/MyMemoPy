@@ -6,7 +6,7 @@ Allows you to translate phrases or text using [Mymemory API](https://mymemory.tr
 
 Just import the `MyMemoryTranslate` class and use the `translate` method, provide the `text`, `source_lang` and `target_lang` parameters, wait for the API response and get your translation.
 
-The API accepts two types of users: `Valid User` (who uses a validated email or API key) and `Anonymous User` (who does not have an email or key). Both have character limitations per day for each translation. [See more details](#MyMemory:-API-usage-limits).
+The API accepts two types of users: `Valid User` (who uses a validated email or API key) and `Anonymous User` (who does not have an email or key). Both have character limitations per day for each translation. [See more details](#API-usage-limits).
 
 
 ## Example of use
@@ -92,9 +92,9 @@ Parameter description:
 | pass | The password associated with the username | Mandatory |     |
 
 
-<a name="MyMemory:-API-usage-limits"></a>
+<a name="API-usage-limits"></a>
 
-# MyMemory: API usage limits
+# API usage limits
 
 ## Get
 
