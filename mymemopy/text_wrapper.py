@@ -3,8 +3,6 @@ Class to divide text if it passes the maximum number of bytes, respecting the
 length of the words, it does not cut them.
 '''
 
-from typing import List
-
 
 class TextWrapper:
     '''

@@ -1,25 +1,27 @@
 '''
+Class `MyMemoryTranslate` that handles the translation, shows the supported
+languages, returns the translation.
 '''
 
 import locale
 
-# from mimic_useragent import mimic_user_agent
+from mymemopy.utils.languages_support import langs
 
-from utils.languages_support import langs
-from utils.parsers import calculate_remain_time
-from text_wrapper import TextWrapper
-from request_api import RequestApi
+from mymemopy.utils.time_parse import DatetimeTranslator
 
-from users import (
+from mymemopy.text_wrapper import TextWrapper
+from mymemopy.request_api import RequestApi
+
+from mymemopy.users import (
     User,
     Anonymous,
     UserValid
 )
 
-from exceptions import (
+from mymemopy.exceptions import (
     ApiGenericException,
     # ApiLimitUsageException,
-    ApiEmailUserException,
+    ApiAuthUserException,
     ApiLimitUsageException,
     EmptyTextException,
     ParameterErrorException,
@@ -30,31 +32,27 @@ from typing import Union
 
 
 class MyMemoryTranslate:
+    '''
+    Translate text using Mymemory API.
+    '''
 
-    api_url = 'https://api.mymemory.translated.net'
     bytes_limit = 500
     line = '-' * 47
 
-    def __init__(self, email: str = None):
+    def __init__(
+        self,
+        user_email: str = None,
+        user_key: str = None
+    ) -> None:
         '''
         Constructor
         '''
-        self.api = RequestApi(self.api_url)
+        self.timerCls = DatetimeTranslator()
+        self.textwrapper = TextWrapper()
+        self.api = RequestApi(timerCls=self.timerCls)
         self.local_lang = locale.getlocale()[0].split('_')[0]
         self.code_langs = list(langs.values())
-        self.textwrapper = TextWrapper()
-        self.user = self.__select_user(email)
-
-    def __select_user(
-        self,
-        email: str = None
-    ) -> User:
-        if email is None:
-            user = Anonymous()
-        else:
-            user = UserValid(email=email)
-        user.load_data()
-        return user
+        self.user = self.__select_user(user_email, user_key)
 
     def show_languages(
         self,
@@ -121,27 +119,34 @@ class MyMemoryTranslate:
             quotaFinished: bool - indicates if it has reached the limit of use.
             result: list - list of string translated.
         '''
-        result = []
+        translated_text = []
         source = data_dict['source']
         target = data_dict['target']
         list_translate = data_dict['translate']
         quotaFinished = False
+        mean_score = []
 
         for chunk_text in list_translate:
             response = self.api.get(
                     text=chunk_text,
                     source_lang=source,
                     target_lang=target,
-                    email_user=self.user.email
+                    email_user=self.user.email,
+                    key_user=self.user.key
                 )
             if response['quotaFinished']:
                 quotaFinished = True
 
-            result.append(response)
+            mean_score.append(float(response['score']))
+
+            translated_text.append(response['translatedText'])
 
         return {
+            'last_translate': self.timerCls.now,
             'quotaFinished': quotaFinished,
-            'result': result
+            'translated_text': translated_text,
+            'mean_score': 0
+            # 'mean_score': round(sum(mean_score) / len(mean_score), 2)
         }
 
     def translate(
@@ -149,19 +154,16 @@ class MyMemoryTranslate:
         text: str,
         source_lang: str = 'auto',
         target_lang: str = 'en'
-    ) -> Union[list, None]:
+    ) -> Union[dict, None]:
         '''
-        Send the given text to api.
+        Sends the given text to the api. By default, `source_lang` it uses the
+        system language (`auto`) and `target_lang` is `en`.
+
+        Returns:
+            str: the translated strings.
         '''
-        if self.user.timeout is not None:
-            remain_time = calculate_remain_time(self.user.timeout)
-            if remain_time is None:
-                self.user.timeout = None
-            else:
-                self.user.to_write(self.user.to_dict())
-                raise TimeOutUsage(remain_time)
-        if self.user.statusQuota():
-            raise ApiLimitUsageException()
+        self.__check_timeout_usage(self.user)
+        self.__check_quota(self.user)
 
         if len(text) <= 0:
             raise EmptyTextException()
@@ -201,22 +203,31 @@ class MyMemoryTranslate:
                 }
 
                 try:
-                    response_translate = self.__send_to_api(data_translate)
-                    if response_translate['quotaFinished']:
+                    res_translate = self.__send_to_api(data_translate)
+                    self.user.set_last_translate(
+                        time=str(res_translate['last_translate'])
+                    )
+                    if res_translate['quotaFinished']:
                         self.user.set_quota(self.user.quota_chars_day)
                         return None
                     else:
                         self.user.set_quota(text_wrapper_dict['text_size'])
-                        return self.__build_text(response_translate['result'])
-                except ApiLimitUsageException:
+                        return self.__build_text(
+                                    res_translate['translated_text']
+                                )
+
+                except ApiLimitUsageException as err1:
                     self.user.timeout = str(self.api.timeout)
                     self.user.to_write(self.user.to_dict())
+                    print(err1)
                     return None
-                except ApiEmailUserException:
+                except ApiAuthUserException as err2:
                     self.user.to_write(self.user.to_dict())
+                    print(err2)
                     return None
-                except ApiGenericException:
+                except ApiGenericException as err3:
                     self.user.to_write(self.user.to_dict())
+                    print(err3)
                     return None
 
     def __build_text(
@@ -238,8 +249,9 @@ class MyMemoryTranslate:
             'mean_score': round(sum(scores) / len(scores), 2)
         }
 
-    def get_status(self):
+    def get_status(self) -> str:
         '''
+        Returns status of User.
         '''
         return 'User: {0}, Current quota: {1} Quota limit: {2}'.format(
             self.user.type,
@@ -247,52 +259,86 @@ class MyMemoryTranslate:
             self.user.quota_chars_day,
         )
 
-    def get_quota(self):
+    def get_quota(self) -> int:
         '''
+        Returns quota of characters limit of User.
         '''
         return self.user.get_quota()
 
+    def __select_user(
+        self,
+        email_user: str = None,
+        key_user: str = None
+    ) -> User:
+        '''
+        Initializate User, load data stored of user and return User object.
+        '''
+        if email_user is None and key_user is None:
+            user = Anonymous()
+        else:
+            user = UserValid(email=email_user, key=key_user)
+        user.load_data()
+        self.__check_clear_quota(user)
+        return user
+
+    def __check_timeout_usage(
+        self,
+        user: User
+    ) -> None:
+        '''
+        Check whether or not there is an API usage time restriction.
+
+        Raise TimeOutUsage
+        '''
+        if user.timeout is not None:
+            remain_time = self.timerCls.calculate_remain_time(
+                                    date_timeout=user.timeout
+                                )
+            if remain_time is None:
+                user.timeout = None
+            else:
+                user.to_write(user.to_dict())
+                raise TimeOutUsage(remain_time)
+
+    def __check_clear_quota(
+        self,
+        user: User
+    ) -> None:
+        '''
+        Check and reset the API usage counter if it is a different day.
+        '''
+        if user.last_translate is not None:
+            clear_quota_usage = self.timerCls.check_day(
+                                        date_string=user.last_translate
+                                    )
+            if clear_quota_usage:
+                user.clear_current_quota()
+
+    def __check_quota(
+        self,
+        user: User
+    ) -> None:
+        '''
+        Check if `User` has reached the API usage limit.
+
+        Raise ApiLimitUsageException.
+        '''
+        if user.statusQuota():
+            raise ApiLimitUsageException()
+
+    def change_user(
+        self,
+        user: User = None
+    ) -> None:
+        '''
+        Change User.
+        '''
+        if user and isinstance(user, User):
+            self.user = user
+            print(f'Change user to `{self.user.type}`.')
+
     def __str__(self):
         '''
+        Representation of User.
         '''
         return f'{self.user}'
-
-
-text = '''
-**Inteligencia Artificial: Transformando el Futuro**
-
-La inteligencia artificial (IA) ha emergido como una fuerza impulsora que transforma nuestro mundo en formas que apenas podríamos haber imaginado. En la intersección de la ciencia de la computación, la estadística y la ingeniería, la IA busca crear sistemas capaces de realizar tareas que, históricamente, requerían inteligencia humana. Este campo fascinante abarca desde algoritmos de aprendizaje automático hasta robots autónomos, y su impacto ya se siente en diversas industrias y aspectos de la vida cotidiana.
-
-*Avances en el Aprendizaje Profundo*
-
-Uno de los hitos más notables en la evolución de la IA es el desarrollo del aprendizaje profundo. Esta técnica, inspirada en la estructura y funcionamiento del cerebro humano, utiliza redes neuronales profundas para procesar datos de manera jerárquica y aprender representaciones complejas. El aprendizaje profundo ha revolucionado campos como la visión por computadora y el procesamiento del lenguaje natural, permitiendo que las máquinas comprendan imágenes, voz y texto con una precisión asombrosa.
-
-*IA en la Medicina: Diagnóstico Preciso y Personalizado*
-
-En el ámbito de la medicina, la IA está desempeñando un papel crucial en la mejora de diagnósticos y tratamientos. Algoritmos de aprendizaje automático analizan grandes conjuntos de datos médicos para identificar patrones y predecir enfermedades. Esto no solo acelera el proceso de diagnóstico, sino que también facilita tratamientos personalizados basados en la información genética de cada paciente. La IA se convierte así en una aliada invaluable para los profesionales de la salud en la lucha contra enfermedades.
-
-**Desafíos Éticos y Consideraciones**
-
-A medida que la IA avanza, también surgen desafíos éticos y preocupaciones sobre su impacto en la sociedad. La toma de decisiones automatizada plantea preguntas cruciales sobre la transparencia y la equidad, ya que los algoritmos pueden heredar sesgos presentes en los datos de entrenamiento. Es esencial abordar estos problemas de manera proactiva para garantizar que la IA se utilice de manera ética y beneficiosa para todos.
-
-En resumen, la inteligencia artificial se encuentra en el centro de una revolución tecnológica que está dando forma al futuro. Desde diagnósticos médicos precisos hasta asistentes virtuales, la IA está cambiando la forma en que vivimos y trabajamos. A medida que exploramos las posibilidades de este campo, es imperativo considerar sus implicaciones éticas y garantizar que su desarrollo se guíe por principios que promuevan el bienestar y la equidad en la sociedad. La inteligencia artificial no solo es una herramienta poderosa, sino también una responsabilidad que debemos abordar con sabiduría y consideración.
-'''
-text = 'hola'
-
-# m = MyMemoryTranslate(email='algo@algo.com')
-m = MyMemoryTranslate(email='example@example.com')
-# m = MyMemoryTranslate()
-text = 'hola!'
-print(m)
-print(m.get_quota())
-
-# r = m.translate(text * 2, 'es', 'en')
-
-r = m.translate(text, 'es', 'en')
-print(m)
-
-# r = m.translate(text, 'ex', 'en')
-# r = m.translate(text, 'es', 'nn')
-# r = m.translate(text, 'ex', 'ññ')
-# for i in r:
-#     print(i)

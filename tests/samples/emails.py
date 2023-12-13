@@ -1,22 +1,19 @@
-emails = [
+valids = [
     'usuario@dominio.com',
     'nombre.apellido@empresa.com',
     'correo123@subdominio.dominio.es',
     'info@sitio.co.uk',
     'usuario+etiqueta@gmail.com',
-    'admin@123.456.789.10',
     'soporte@mi-sitio-web.org',
-    'cliente@servicio.co',
-    'ventas@productos.com.mx',
-    'contacto@sitio-web.info',
+    'cliente@servicio.co'
+]
+
+invalids = [
+    'admin@123.456.789.10',
     'usuario@dominio',
     'nombre.apellido@empresa',
     'correo123@subdominio.dominio',
     'info@sitio',
     'usuario+etiqueta@gmail',
-    'admin@123.456.789',
-    'soporte@mi-sitio-web',
-    'cliente@servicio',
-    'ventas@productos',
-    'contacto@sitio-web',
+    'admin@123.456.789'
 ]

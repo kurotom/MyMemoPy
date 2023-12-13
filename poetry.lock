@@ -143,6 +143,17 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
+name = "terminal-in-colors"
+version = "0.1.3"
+description = "Your terminal in colors :D"
+optional = false
+python-versions = ">=3.7,<4.0"
+files = [
+    {file = "terminal_in_colors-0.1.3-py3-none-any.whl", hash = "sha256:fb4af988ba0a2d9ce44f3c6b51c4bb4c9b04758d77bb3edaa44d03ad37670316"},
+    {file = "terminal_in_colors-0.1.3.tar.gz", hash = "sha256:e1cccc4f4772df3467a9b8f486b5e0d023c1e8c4ad72036b9d6df16fca9237e3"},
+]
+
+[[package]]
 name = "urllib3"
 version = "2.0.7"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -162,4 +173,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.7"
-content-hash = "8943229d16d203efd3d2bc1e92df7baa28e01ebf0c6813b573ab5b2c29b41aa9"
+content-hash = "be4121ae4126f3a7bf2aa17390dd90e84e879a9be11b80959ebd52e52e0837a0"
