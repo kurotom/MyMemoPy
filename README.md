@@ -2,6 +2,10 @@
 
 Allows you to translate phrases or text using [Mymemory API](https://mymemory.translated.net/).
 
+# Installation
+
+Just run on terminal this command: `$ pip install mymemopy` and enjoy.
+
 # Usage
 
 Just import the `MyMemoryTranslate` class and use the `translate` method, provide the `text`, `source_lang` and `target_lang` parameters, wait for the API response and get your translation.
