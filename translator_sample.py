@@ -6,7 +6,7 @@ from mymemopy.translator import MyMemoryTranslate
 
 
 def valid_user():
-    vu = MyMemoryTranslate(email='example@example.com')
+    vu = MyMemoryTranslate(user_email='example@example.com')
     print(vu)
     print(vu.get_quota())
     res = vu.translate('hola', 'es', 'en')
